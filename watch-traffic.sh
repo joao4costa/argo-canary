@@ -1,45 +1,53 @@
 #!/bin/bash
 # Script para monitorar a divisão de tráfego do Canary
-# Uso: ./watch-traffic.sh
 
-URL="http://localhost:8888"
-
-echo "Iniciando monitoramento de tráfego em $URL..."
+echo "Iniciando monitoramento via pod temporário no cluster (kubectl)..."
 echo "Pressione CTRL+C para parar."
 echo "---------------------------------------------"
 
-while true; do
-  # Faz a requisição e extrai o HTTP Code e o corpo
-  response=$(curl -s -w "%{http_code}" $URL)
-  http_code=${response: -3}
-  body=${response:0:${#response}-3}
+trap "sudo kubectl delete pod tester --ignore-not-found=true > /dev/null 2>&1; exit" SIGINT SIGTERM
 
-  # Data/Hora atual
-  timestamp=$(date +"%H:%M:%S")
+sudo kubectl delete pod tester --ignore-not-found=true > /dev/null 2>&1
 
-  if [ "$http_code" -eq 200 ]; then
-    # Tenta extrair a versão do JSON (requer jq ou grep simples)
-    if command -v jq &> /dev/null; then
-      version=$(echo $body | jq -r .version)
-    else
-      # Fallback simples se não tiver jq
-      version=$(echo $body | grep -o '"version":"[^"]*"' | cut -d'"' -f4)
-    fi
+sudo kubectl run --attach --quiet --rm --restart=Never \
+    --image=curlimages/curl tester -- \
+    sh -c '
+        while true; do 
+            curl -s http://argo-canary/ | grep version; 
+            sleep 0.2; 
+        done
+    ' 2>/dev/null | {
+  
+  declare -A VERSION_COLORS
+  COLORS=("\033[0;34m" "\033[0;32m" "\033[0;33m" "\033[0;35m" "\033[0;36m")
+  COLOR_IDX=0
+  NC="\033[0m"
+  
+  # Variável para rastrear a última versão vista
+  LAST_VERSION=""
+
+  while read -r line; do
+    timestamp=$(date +"%H:%M:%S")
+    version=$(echo "$line" | grep -o '"version":"[^"]*"' | cut -d'"' -f4)
     
-    # Cores baseadas na versão (apenas visual)
-    if [[ "$version" == "1.0.0" ]]; then
-       COLOR="\033[0;34m" # Blue
-    elif [[ "$version" == "2.0.0" ]]; then
-       COLOR="\033[0;32m" # Green
-    else
-       COLOR="\033[0;33m" # Yellow (outras versões)
+    if [[ -z "$version" ]]; then
+       continue
     fi
-    NC="\033[0m" # No Color
 
-    echo -e "[$timestamp] Status: $http_code | Versão: ${COLOR}${version}${NC}"
-  else
-    echo "[$timestamp] Erro: $http_code"
-  fi
+    # --- LÓGICA DE QUEBRA DE LINHA ---
+    # Se já houve uma versão anterior e ela é diferente da atual
+    if [[ -n "$LAST_VERSION" && "$version" != "$LAST_VERSION" ]]; then
+         echo "---------------------------------------------" # Ou apenas echo ""
+    fi
+    LAST_VERSION="$version"
+    # ---------------------------------
 
-  sleep 3
-done
+    if [[ -z "${VERSION_COLORS[$version]}" ]]; then
+         VERSION_COLORS[$version]="${COLORS[$COLOR_IDX]}"
+         COLOR_IDX=$(( (COLOR_IDX + 1) % ${#COLORS[@]} ))
+    fi
+
+    COLOR="${VERSION_COLORS[$version]}"
+    echo -e "[$timestamp] Versão: ${COLOR}${version}${NC}"
+  done
+}
