@@ -84,3 +84,7 @@ Para visualizar as versões respondendo em tempo real (Canary), utilize o script
 ./watch-traffic.sh
 ```
 Ele fará requisições a cada 3 segundos e pintará a versão no terminal. Isso ajuda a ver a transição (ex: 75% v1, 25% v2).
+---
+```
+sudo kubectl run -it --rm --restart=Never --image=curlimages/curl tester -- sh -c 'for i in $(seq 1 20); do curl -s http://argo-canary/ | grep version; sleep 0.2; done'
+```
