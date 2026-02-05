@@ -18,4 +18,4 @@ spec:
           service:
             name: argo-canary
             port:
-              number: 90
+              number: 80
