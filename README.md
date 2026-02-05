@@ -73,3 +73,14 @@ Para testar (em outro terminal):
 curl http://localhost:8888
 # Retorno esperado: {"version":"1.0.0"}
 ```
+
+---
+
+## 4. Validar Divisão de Tráfego (Watch Script)
+
+Para visualizar as versões respondendo em tempo real (Canary), utilize o script auxiliar:
+
+```bash
+./watch-traffic.sh
+```
+Ele fará requisições a cada 3 segundos e pintará a versão no terminal. Isso ajuda a ver a transição (ex: 75% v1, 25% v2).
