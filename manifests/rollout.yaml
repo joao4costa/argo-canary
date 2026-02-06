@@ -18,7 +18,7 @@ spec:
       containers:
         - name: argo-canary
           # Ensure this image is built and available in your cluster/registry
-          image: "argo-canary:4.0.0" 
+          image: "argo-canary:5.0.0" 
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
